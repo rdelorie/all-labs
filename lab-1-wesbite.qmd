@@ -1,0 +1,277 @@
+---
+title: “Lab 2“
+author: Rachel Delorie
+format: html
+execute:
+  echo: true
+---
+
+```{r}
+library(dplyr)
+library(tidyverse)
+```
+
+```{r}
+tree_dat <- read.csv("/Users/racheldelorie/github-old/Lab 2/data/doi_10_5061_dryad_18pm5__v20170130/Itter_et_al_EAP16-0589.R1/tree_dat.csv")
+```
+
+```{r}
+# number 1
+glimpse(tree_dat)
+#glimpse lets us take a look at the data without having to file.
+# answer: the structure is a table with 131,386 rows and 8 columns.
+```
+
+```{r}
+# number 2
+tree_count1 <- tree_dat %>%
+  # above makes it save in environments
+filter(standID == 1) %>%
+tally()
+# answer: 979 records in stand 1.
+```
+
+```{r}
+# number 3
+tree_dat %>% 
+  filter(species %in% c("ABBA","PIST")) %>% 
+  #filter will find species in the two columns we want, c will combine them.
+  count(species)
+# count will just count the number of records. 
+  
+# answer: ABBA has 13033 records and PIST has 4188 records.
+```
+
+```{r}
+# number 4
+last_year <- max(tree_dat$year, na.rm = TRUE) # will find the last year in the data set, makes new assignment
+
+tree_dat %>%
+  filter(year == last_year, age > 200) %>% tally() # count trees older than 200 years in the last year
+
+#first function finds the last year in the dataset, and the 2nd function filters rows where the ages is greater than 200
+
+# answer: 7 trees.
+```
+
+```{r}
+# number 5
+
+oldest_tree <- tree_dat %>%
+  slice_max(order_by = age, n = 1)
+
+  #selects the single row with the highest age (n = 1). to categorize the oldest tree an assignment was made.
+
+# answer: the oldest tree is a PIRE.
+```
+
+```{r}
+# number 6
+five_oldest_2001 <- tree_dat %>%
+  filter(year == 2001) %>%
+  slice_max(order_by = age, n = 5)
+
+#five oldest trees in 2001. filter makes it to only be trees in 2001, and slice max orders them by age and then takes the 5 oldest rows. 
+
+# answer: 5 oldest trees were found.
+```
+
+```{r}
+# number 7
+tree_dat %>%
+filter(year == 2002) %>%
+  # filters to only year 2002
+slice_sample (prop = 0.3)
+# slice sample n = number will choose that amount of rows randomly. The prop = 0.3 tells it to take the proportion .3, or 30 percent
+
+# answer: 687 trees
+```
+
+```{r}
+# number 8
+tree_dat %>%
+  filter(standID == 5, year == 2007) %>% 
+# filters to year and stand we want
+arrange(desc(rad_ib)) %>% 
+  #arrange shows the rows based on values in columns. It default will ascend, so desc makes it go in that order and then we specify which column we want it to be using.
+slice_head(n = 3)
+# slice head gives us the top 3 trees (n = 3)
+# answer: tree ids are 128, 157, and 135.
+```
+
+```{r}
+# number 9
+tree_dat %>%
+  select(treeID, standID, year, rad_ib) %>% 
+  # select() will only show the columns that we ask it to.
+  filter(standID == 3, year == 2007) %>% 
+  # only stand 3 and only 2007 trees
+  slice_min(order_by = rad_ib, n = 3)
+# slice min will take min values, order by tells us what column to reference, n is number we want returned
+
+#answer: 3 smallest trees have the treeIDs: 50, 56, and 36
+```
+
+```{r}
+# number 10 
+tree_dat %>%
+  select(-stand)
+#minus sign in front of stand tells it to take it out
+glimpse(tree_dat)
+
+# answer: stand column removed.
+```
+
+```{r}
+# number 11
+
+# answer: contains() would be a good option for selecting all columns with the string "ID" in the name.
+```
+
+```{r}
+# number 12
+tree_dat %>%
+  select(contains("ID"), contains("stand"))
+#contains will give us the content with the literal string. select will select it.
+
+# answer: selection found.
+
+```
+
+```{r}
+# number 13
+tree_dat <- tree_dat %>%
+  rename(inc_mm = inc) %>% 
+  rename(rad_ib_mm = rad_ib)
+
+#new name = old name
+```
+
+```{r}
+# number 14
+basal_area_col <- tree_dat %>%
+  #mutate(new_col = old_col * factor)
+  mutate(rad_ib_cm = rad_ib_mm * 0.1) %>% # mm to cm
+mutate(dbh_ib_cm = rad_ib_cm * 2) %>%  #radius to diameter at bh
+mutate(dbh_cmsq = dbh_ib_cm ^ 2) %>% 
+# dbh to dbh squared
+mutate(basal_area_m = dbh_cmsq * 0.00007854) %>%
+  #conversion factor
+#Ba m^2 = 0.00007854 * DBH ^2
+
+filter(species == "POTR", year == 2007) %>% 
+  #only species POTR
+summarize(mean(basal_area_m,na.rm = TRUE))
+# find the mean basal area. na.rm = true ensures that missing values don't effect results
+
+print(basal_area_col) # display my result
+# answer: mean BA_m^2 in POTR in 2007 is 0.03696619 m^2
+```
+
+```{r}
+# number 15
+established <- tree_dat %>%
+  #if_else(condition, true, false, missing = NULL)
+mutate (established = if_else(age > 5, TRUE, FALSE)) %>%  #mutate make the new column, if_else applies the boolean
+count (established)
+# answer: 122503 established trees.
+```
+
+```{r}
+# number 16
+dbh_class <- tree_dat %>%
+  # TRUE ~ default_result is a catch-all for any observation that doesn't meet defined condition
+#  case_when(
+ # condition1 ~ result1,
+ # condition2 ~ result2,
+#  condition3 ~ result3,
+ # TRUE ~ default_result)
+  mutate(dbh_mm = rad_ib_mm *2) %>% #calculate dbh (radius times 2)
+  mutate(dbh_class = case_when(
+    dbh_mm < 2.5 ~ "seedling",
+    dbh_mm >= 2.5 & dbh_mm < 10 ~ "sapling",
+    dbh_mm >= 10 & dbh_mm < 30 ~ "pole",
+    dbh_mm >= 30 ~ "sawlog")) %>% # no upper limit
+filter(year==2007) %>% #show trees in 2007
+count(dbh_class)
+# answer: 2291 trees, all are sawlogs.
+```
+
+```{r}
+# number 17
+tree_dat %>%
+ mutate(rad_ib_cm = rad_ib_mm * 0.1) %>% 
+  mutate(dbh_ib_cm = rad_ib_cm * 2) %>%  #radius to diameter at bh
+filter (year == 2007) %>% 
+  summarize(sd_dbh = sd(dbh_ib_cm, na.rm = TRUE))
+#first argument is the dataframe and after it says how we collapse it
+# answer: 6.138643 is the sd. sd is the measure of how dispersed data is in relation to the mean value.	
+```
+
+```{r}
+# number 18
+tree_dat <- tree_dat %>%
+  mutate(age = as.numeric(age))  # Ensure age is numeric
+
+tree_dat %>%
+  filter(year == 2003) %>%
+  group_by(species) %>%
+  summarize(mean_age = mean(age, na.rm = TRUE)) %>%
+  slice_max(order_by = mean_age, n = 3)
+#answer: THOC	126.63830	, FRNI	83.08333	, PIST	73.28571	
+```
+
+```{r}
+# number 19
+tree_dat %>% 
+  summarize(first_year = min(year, na.rm = TRUE), last_year = max(year, na.rm = TRUE), unique_years = n_distinct(year, na.rm = TRUE))
+#r of unique years with records in data, and first and last year recorded
+
+#answer: first year: 1897. Last year: 2007. Unique years: 111.
+```
+
+```{r}
+# number 20
+tree_dat %>%
+  group_by(stand) %>% #stand only
+ summarize(unique_years = n_distinct(year, na.rm = TRUE)) %>% # unique years = n_distinct
+  filter(unique_years == max(unique_years)) #only show unique years
+
+#answer: A1, D1, D2, D3, F1 all have a unique year of 111.
+  
+```
+
+```{r}
+# final question
+growth_rates <- tree_dat %>%
+  arrange(species, treeID, year) %>% # will ensure correct order
+  group_by(treeID, species) %>% 
+   mutate(rad_ib_cm = rad_ib_mm * 0.1) %>% # mm to cm
+mutate(dbh_ib_cm = rad_ib_cm * 2) %>%  #radius to diameter at bh
+  mutate(annual_growth = dbh_ib_cm - lag(dbh_ib_cm)) %>% # Compute per-year growth
+  filter(!is.na(annual_growth)) %>% # Remove first year (NA values)
+  summarise(
+    total_years = n(),  # Count years of recorded growth
+    mean_growth = mean(annual_growth, na.rm = TRUE),  # Average per-year growth
+    sd_growth = sd(annual_growth, na.rm = TRUE)
+  ) %>%
+  filter(total_years >= 10) %>% # Only include trees with at least 10 years of growth
+  group_by(species) %>%
+  summarise(
+    species_mean_growth = mean(mean_growth, na.rm = TRUE),
+    species_sd_growth = sd(mean_growth, na.rm = TRUE)
+  ) %>%
+  arrange(desc(species_mean_growth)) # Rank by fastest growth
+
+# Top 3 fastest-growing species
+top_3_fastest <- growth_rates %>% slice_head(n = 3)
+
+# Bottom 3 slowest-growing species
+top_3_slowest <- growth_rates %>% slice_tail(n = 3)
+
+# see results
+print(top_3_fastest)
+print(top_3_slowest)
+
+# answer: 3 fastest are PIRE, PIBA, and POTR. 3 slowest are QURU, LALA, THOC
+```

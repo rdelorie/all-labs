@@ -1,5 +1,6 @@
-project:
-  title: "all-labs"
-
-editor: visual
-
+project: 
+  title: “All Labs“ 
+  output-dir: docs
+  type: website
+  
+format: html

@@ -1,0 +1,116 @@
+---
+title: Lab 4
+author: Rachel Delorie
+date: "2025-03-13"
+format: html
+execute:
+  echo: true
+---
+
+```{r}
+# setup
+remotes::install_github("lter/lterdatasampler")
+library(tidyverse)
+library(ggpubr)
+library(lterdatasampler)
+library(car)
+library(visdat)
+?and_vertebrates
+```
+
+```{r}
+# Exercises Part 1 
+
+# First clean the dataset to create the contingency table from
+salamander_clean <- and_vertebrates %>%  
+  #filter coastal salamanders
+  filter(species == "Coastal giant salamander") %>% 
+  drop_na(unittype, section)
+
+cont_table <- table(salamander_clean$section, salamander_clean$unittype)
+
+chisq.test(cont_table)
+
+# report: The chi-square test for independence revealed a significant relationship between forest type and channel unit type for Coastal giant salamander abundance (p < 0.001). This result suggests that salamander abundance varies significantly across different channel unit types depending on the forest type.
+
+cc_weight <- salamander_clean %>% 
+  filter(section == "CC") %>%  
+  pull(weight_g)
+
+og_weight <- salamander_clean %>% 
+  filter(section == "OG") %>% 
+  pull(weight_g)
+
+var.test(cc_weight, og_weight)
+# The F-test conducted was done to compare coastal giant salamander biomass between clear-cut and old-growth forest types. The Test result (F = 0.829, p < 0.001) shows a significant difference in variances. Biomass variability was lower in clea-cut forests. 
+
+#correlation test between snout to fork and weight (bodymass). weight is weight_g and snout to fork is length 1
+correlation <- and_vertebrates %>%  
+  filter(species == "Coastal giant salamander") %>%  
+  drop_na(length_1_mm, weight_g)
+cor.test(log(salamander_clean$length_1_mm), log(salamander_clean$weight_g))
+# The results indicate a strong positive correlation between weight and length of Coastal giant salamanders (r = 0.986). 
+```
+
+```{r}
+# Exercises part 2
+vis_dat(pie_crab)
+?pie_crab
+# normal distribution?
+norms <- pie_crab %>%  
+  nest(data = -site) %>% 
+  mutate(Shapiro = map(data, ~ shapiro.test(.x$size)),
+         n = map_dbl(data, nrow),
+         glance_shapiro = map(Shapiro, broom::glance)) %>% 
+  unnest(glance_shapiro)
+
+(res_aov <- aov(size ~ site, data = pie_crab))
+gghistogram(res_aov$residuals)
+
+#perform Welch's ANOVA
+oneway.test(size ~ site, data = pie_crab, var.equal = FALSE)
+# Filter a subset of the sites
+pie_sites <- pie_crab |> 
+  filter(site %in% c("GTM", "DB", "PIE"))
+# Check for equal variance
+leveneTest(size ~ site, data = pie_sites)
+
+# are variances equal? if yes, proceed w ANOVA
+# ANOVA for the data subset:
+pie_anova <- aov(size ~ site, data = pie_sites)
+# View the ANOVA results 
+summary(pie_anova)
+# post-hoc Tukey HSD
+TukeyHSD(pie_anova)
+
+ggplot(pie_crab, aes(x = reorder(site, latitude), y = size)) +
+  geom_boxplot() +
+  labs(
+    x = "Site (Ordered by Latitude)",
+    y = "Carapace Width (mm)",
+    title = "Carapace Width by Site Ordered by Latitude"
+  ) +
+  theme_minimal()
+
+water_lm <- lm(water_temp_sd ~ size, data = pie_crab)
+pie_crab %>%  
+  ggscatter(x = 'latitude', y = 'size', 
+            alpha = .35, 
+            add = "reg.line") + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue")  # Adding the linear model
+
+# part 2 qustion 3: multiple linear regression
+
+#check for correlation
+pie_corr <- pie_crab %>% 
+  select(latitude, air_temp_sd, water_temp_sd) %>% 
+  cor(use = "complete.obs") %>% 
+  round(2)  # Rounds to 2 decimal places for readability
+print(pie_corr)
+# the results of the correlation check show that latitude is strongly positively correlated with air temp sd, air temp sd is moderately positively correlated with water temp sd, and latitude has a very weak correlation with water temp sd. 
+
+pie_mlm <- lm(size ~ latitude + air_temp_sd + water_temp_sd, data = pie_crab)
+summary(pie_mlm)
+#This regression model shows that latitude has a significant positive effect on size, while air temp and water temp do not. The model Explains about 35% of variance in size. 
+
+```
